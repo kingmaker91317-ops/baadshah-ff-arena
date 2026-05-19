@@ -1,186 +1,435 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
-  useGetAdminStats,
-  getGetAdminStatsQueryKey,
-  useListTournaments,
-  getListTournamentsQueryKey,
-  useCreateTournament,
-  useUpdateTournament,
-  useDeleteTournament,
-  useSetRoomDetails,
-  useListRechargeRequests,
-  getListRechargeRequestsQueryKey,
-  useApproveRecharge,
-  useRejectRecharge,
-  useGetTournamentRegistrations,
-  getGetTournamentRegistrationsQueryKey,
+  useGetAdminStats, getGetAdminStatsQueryKey,
+  useListTournaments, getListTournamentsQueryKey,
+  useCreateTournament, useUpdateTournament, useDeleteTournament,
+  useSetRoomDetails, useListRechargeRequests, getListRechargeRequestsQueryKey,
+  useApproveRecharge, useRejectRecharge,
+  useGetTournamentRegistrations, getGetTournamentRegistrationsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
-import { Trophy, Users, Zap, DollarSign, Plus, Trash2, Edit3, Key, Check, X } from "lucide-react";
+import {
+  Trophy, Users, Zap, Coins, Plus, Trash2, Edit3, Key, Check, X,
+  Shield, BarChart3, CreditCard, ArrowUpRight, Crown, Eye, Search,
+  Clock, ImageIcon, Hash, Lock, Sword, ChevronDown, ChevronUp, UserCog,
+} from "lucide-react";
 
-function StatsGrid() {
+const BASE = "/api";
+const authHeaders = () => ({
+  "Content-Type": "application/json",
+  "x-firebase-uid": localStorage.getItem("firebase_uid") || "",
+});
+
+// ─── Sidebar nav ─────────────────────────────────────────────────────────────
+const TABS = [
+  { id: "dashboard", label: "Dashboard", icon: <BarChart3 className="w-4 h-4" /> },
+  { id: "tournaments", label: "Tournaments", icon: <Trophy className="w-4 h-4" /> },
+  { id: "recharges", label: "Recharges", icon: <CreditCard className="w-4 h-4" />, badge: "recharges" },
+  { id: "withdrawals", label: "Withdrawals", icon: <ArrowUpRight className="w-4 h-4" />, badge: "withdrawals" },
+  { id: "users", label: "Players", icon: <Users className="w-4 h-4" /> },
+];
+
+// ─── Stats ────────────────────────────────────────────────────────────────────
+function DashboardTab() {
   const { data: stats, isLoading } = useGetAdminStats({ query: { queryKey: getGetAdminStatsQueryKey() } });
-  const statItems = [
-    { icon: <Users className="w-5 h-5" />, value: stats?.totalUsers, label: "Total Users" },
-    { icon: <Trophy className="w-5 h-5" />, value: stats?.totalTournaments, label: "Tournaments" },
-    { icon: <Zap className="w-5 h-5" />, value: stats?.activeTournaments, label: "Active" },
-    { icon: <Users className="w-5 h-5" />, value: stats?.totalRegistrations, label: "Registrations" },
-    { icon: <DollarSign className="w-5 h-5" />, value: stats?.pendingRecharges, label: "Pending Recharges" },
-    { icon: <Trophy className="w-5 h-5" />, value: stats?.totalRevenue, label: "Total Revenue (coins)" },
+  const items = [
+    { icon: <Users className="w-5 h-5 text-blue-400" />, value: stats?.totalUsers, label: "Total Players", color: "border-blue-500/20 bg-blue-500/5" },
+    { icon: <Trophy className="w-5 h-5 text-orange-400" />, value: stats?.totalTournaments, label: "Tournaments", color: "border-orange-500/20 bg-orange-500/5" },
+    { icon: <Zap className="w-5 h-5 text-green-400" />, value: stats?.activeTournaments, label: "Active Now", color: "border-green-500/20 bg-green-500/5" },
+    { icon: <Users className="w-5 h-5 text-purple-400" />, value: stats?.totalRegistrations, label: "Registrations", color: "border-purple-500/20 bg-purple-500/5" },
+    { icon: <CreditCard className="w-5 h-5 text-yellow-400" />, value: stats?.pendingRecharges, label: "Pending Recharges", color: "border-yellow-500/20 bg-yellow-500/5" },
+    { icon: <ArrowUpRight className="w-5 h-5 text-red-400" />, value: stats?.pendingWithdrawals, label: "Pending Withdrawals", color: "border-red-500/20 bg-red-500/5" },
+    { icon: <Coins className="w-5 h-5 text-yellow-400" />, value: stats?.totalRevenue, label: "Total Revenue (coins)", color: "border-yellow-500/20 bg-yellow-500/5" },
   ];
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-      {statItems.map((s, i) => (
-        <div key={i} className="bg-card border border-border rounded-lg p-4 text-center">
-          <div className="text-primary flex justify-center mb-2">{s.icon}</div>
-          {isLoading ? <Skeleton className="h-8 w-16 mx-auto" /> : <p className="text-2xl font-black">{s.value ?? 0}</p>}
-          <p className="text-xs text-muted-foreground font-mono uppercase">{s.label}</p>
-        </div>
-      ))}
+    <div>
+      <h2 className="text-xl font-black uppercase tracking-widest text-white mb-6">Arena Overview</h2>
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+        {items.map((s, i) => (
+          <div key={i} className={`border rounded-xl p-4 ${s.color}`}>
+            <div className="mb-3">{s.icon}</div>
+            {isLoading ? <Skeleton className="h-8 w-16 bg-zinc-700 mb-1" /> : (
+              <p className="text-3xl font-black text-white">{(s.value ?? 0).toLocaleString()}</p>
+            )}
+            <p className="text-xs text-zinc-500 font-mono uppercase tracking-wider mt-1">{s.label}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
+// ─── Tournament form ──────────────────────────────────────────────────────────
 function TournamentForm({ initial, onSubmit, isPending, onCancel }: {
   initial?: any; onSubmit: (d: any) => void; isPending: boolean; onCancel: () => void;
 }) {
-  const [title, setTitle] = useState(initial?.title || "");
-  const [mode, setMode] = useState(initial?.mode || "solo");
-  const [status, setStatus] = useState(initial?.status || "upcoming");
-  const [prizePool, setPrizePool] = useState(String(initial?.prizePool || ""));
-  const [entryFee, setEntryFee] = useState(String(initial?.entryFee || "0"));
-  const [maxSlots, setMaxSlots] = useState(String(initial?.maxSlots || "100"));
-  const [scheduledAt, setScheduledAt] = useState(initial?.scheduledAt ? new Date(initial.scheduledAt).toISOString().slice(0, 16) : "");
-  const [mapName, setMapName] = useState(initial?.mapName || "");
-  const [description, setDescription] = useState(initial?.description || "");
+  const [f, setF] = useState({
+    title: initial?.title || "",
+    mode: initial?.mode || "solo",
+    status: initial?.status || "upcoming",
+    prizePool: String(initial?.prizePool || ""),
+    entryFee: String(initial?.entryFee || "0"),
+    maxSlots: String(initial?.maxSlots || "100"),
+    scheduledAt: initial?.scheduledAt ? new Date(initial.scheduledAt).toISOString().slice(0, 16) : "",
+    mapName: initial?.mapName || "",
+    description: initial?.description || "",
+  });
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+    setF((p) => ({ ...p, [k]: e.target.value }));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ title, mode, status, prizePool: parseInt(prizePool), entryFee: parseInt(entryFee), maxSlots: parseInt(maxSlots), scheduledAt: new Date(scheduledAt).toISOString(), mapName: mapName || undefined, description: description || undefined });
+    onSubmit({
+      title: f.title, mode: f.mode, status: f.status,
+      prizePool: parseInt(f.prizePool), entryFee: parseInt(f.entryFee),
+      maxSlots: parseInt(f.maxSlots), scheduledAt: new Date(f.scheduledAt).toISOString(),
+      mapName: f.mapName || undefined, description: f.description || undefined,
+    });
   };
 
+  const inputCls = "w-full bg-zinc-800 border border-zinc-700 focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 rounded-xl px-4 py-2.5 text-white placeholder-zinc-600 font-mono text-sm outline-none transition-all";
+  const labelCls = "block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-1.5";
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
-      <div className="space-y-1"><Label>Title</Label><Input value={title} onChange={e => setTitle(e.target.value)} required /></div>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className={labelCls}>Title</label>
+        <input value={f.title} onChange={set("title")} required placeholder="Tournament name" className={inputCls} />
+      </div>
       <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <Label>Mode</Label>
-          <Select value={mode} onValueChange={setMode}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent><SelectItem value="solo">Solo</SelectItem><SelectItem value="duo">Duo</SelectItem><SelectItem value="squad">Squad</SelectItem></SelectContent>
-          </Select>
+        <div>
+          <label className={labelCls}>Mode</label>
+          <select value={f.mode} onChange={set("mode")} className={inputCls + " appearance-none cursor-pointer"}>
+            <option value="solo">⚔ Solo</option>
+            <option value="duo">👥 Duo</option>
+            <option value="squad">⚡ Squad</option>
+          </select>
         </div>
-        <div className="space-y-1">
-          <Label>Status</Label>
-          <Select value={status} onValueChange={setStatus}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent><SelectItem value="upcoming">Upcoming</SelectItem><SelectItem value="live">Live</SelectItem><SelectItem value="completed">Completed</SelectItem></SelectContent>
-          </Select>
+        <div>
+          <label className={labelCls}>Status</label>
+          <select value={f.status} onChange={set("status")} className={inputCls + " appearance-none cursor-pointer"}>
+            <option value="upcoming">🔵 Upcoming</option>
+            <option value="live">🔴 Live</option>
+            <option value="completed">✓ Completed</option>
+          </select>
         </div>
       </div>
       <div className="grid grid-cols-3 gap-3">
-        <div className="space-y-1"><Label>Prize Pool</Label><Input type="number" value={prizePool} onChange={e => setPrizePool(e.target.value)} required /></div>
-        <div className="space-y-1"><Label>Entry Fee</Label><Input type="number" value={entryFee} onChange={e => setEntryFee(e.target.value)} required /></div>
-        <div className="space-y-1"><Label>Max Slots</Label><Input type="number" value={maxSlots} onChange={e => setMaxSlots(e.target.value)} required /></div>
+        <div>
+          <label className={labelCls}>Prize Pool</label>
+          <input type="number" value={f.prizePool} onChange={set("prizePool")} required className={inputCls} placeholder="5000" />
+        </div>
+        <div>
+          <label className={labelCls}>Entry Fee</label>
+          <input type="number" value={f.entryFee} onChange={set("entryFee")} required className={inputCls} placeholder="20" />
+        </div>
+        <div>
+          <label className={labelCls}>Max Slots</label>
+          <input type="number" value={f.maxSlots} onChange={set("maxSlots")} required className={inputCls} placeholder="100" />
+        </div>
       </div>
-      <div className="space-y-1"><Label>Scheduled At</Label><Input type="datetime-local" value={scheduledAt} onChange={e => setScheduledAt(e.target.value)} required /></div>
       <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1"><Label>Map Name</Label><Input value={mapName} onChange={e => setMapName(e.target.value)} /></div>
-        <div className="space-y-1"><Label>Description</Label><Input value={description} onChange={e => setDescription(e.target.value)} /></div>
+        <div>
+          <label className={labelCls}>Scheduled At</label>
+          <input type="datetime-local" value={f.scheduledAt} onChange={set("scheduledAt")} required className={inputCls} />
+        </div>
+        <div>
+          <label className={labelCls}>Map Name</label>
+          <input value={f.mapName} onChange={set("mapName")} placeholder="Bermuda, Kalahari..." className={inputCls} />
+        </div>
       </div>
-      <div className="flex gap-2 pt-2">
-        <Button type="submit" className="flex-1 font-bold uppercase" disabled={isPending}>{isPending ? "Saving..." : "Save"}</Button>
-        <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+      <div>
+        <label className={labelCls}>Description</label>
+        <textarea value={f.description} onChange={set("description")} rows={2} placeholder="Tournament description..." className={inputCls + " resize-none"} />
+      </div>
+      <div className="flex gap-3 pt-1">
+        <button type="submit" disabled={isPending}
+          className="flex-1 bg-orange-500 hover:bg-orange-400 text-white font-black uppercase tracking-widest py-3 rounded-xl transition-all disabled:opacity-50 shadow-lg shadow-orange-500/20">
+          {isPending ? "Saving..." : initial ? "Save Changes" : "Create Tournament"}
+        </button>
+        <button type="button" onClick={onCancel}
+          className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold py-3 px-5 rounded-xl transition-all">
+          Cancel
+        </button>
       </div>
     </form>
   );
 }
 
-export default function Admin() {
-  const { dbUser, loading } = useAuth();
-  const [, setLocation] = useLocation();
+// ─── Winner selector ──────────────────────────────────────────────────────────
+function WinnerModal({ tournamentId, onClose }: { tournamentId: number; onClose: () => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { data: regs } = useGetTournamentRegistrations(tournamentId, {
+    query: { enabled: !!tournamentId, queryKey: getGetTournamentRegistrationsQueryKey(tournamentId) }
+  });
+  const [selectedRegId, setSelectedRegId] = useState<number | null>(null);
+  const [prizeAmount, setPrizeAmount] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const { data: tournaments, isLoading: tLoading } = useListTournaments({}, { query: { queryKey: getListTournamentsQueryKey({}) } });
-  const { data: rechargeRequests, isLoading: rLoading } = useListRechargeRequests({ query: { queryKey: getListRechargeRequestsQueryKey() } });
+  const handleSelectWinner = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRegId || !prizeAmount) return;
+    setLoading(true);
+    try {
+      const r = await fetch(`${BASE}/admin/tournaments/${tournamentId}/winner`, {
+        method: "POST", headers: authHeaders(),
+        body: JSON.stringify({ registrationId: selectedRegId, prizeAmount: parseInt(prizeAmount) }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      toast({ title: "🏆 Winner crowned & prize credited!" });
+      queryClient.invalidateQueries({ queryKey: getGetAdminStatsQueryKey() });
+      onClose();
+    } catch { toast({ title: "Failed to set winner", variant: "destructive" }); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <Modal title="👑 Select Tournament Winner" onClose={onClose}>
+      <form onSubmit={handleSelectWinner} className="space-y-4">
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Select Winner</label>
+          {regs && regs.length > 0 ? (
+            <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+              {regs.map((reg) => (
+                <label key={reg.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${selectedRegId === reg.id ? "border-orange-500 bg-orange-500/10" : "border-zinc-700 bg-zinc-800/60 hover:border-zinc-600"}`}>
+                  <input type="radio" name="winner" value={reg.id} onChange={() => setSelectedRegId(reg.id)} className="accent-orange-500" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-white text-sm">{reg.freeFireName}</p>
+                    <p className="text-xs text-zinc-500 font-mono">{reg.freeFireUid} · {reg.user?.email}</p>
+                    {reg.teamName && <p className="text-xs text-zinc-600">Team: {reg.teamName}</p>}
+                  </div>
+                  {selectedRegId === reg.id && <Crown className="w-4 h-4 text-yellow-400" />}
+                </label>
+              ))}
+            </div>
+          ) : <p className="text-zinc-500 font-mono text-sm">No registrations found.</p>}
+        </div>
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Prize Amount (coins)</label>
+          <input
+            type="number" value={prizeAmount} onChange={(e) => setPrizeAmount(e.target.value)}
+            required min={1} placeholder="e.g. 5000"
+            className="w-full bg-zinc-800 border border-zinc-700 focus:border-orange-500 rounded-xl px-4 py-2.5 text-white font-mono text-sm outline-none transition-all"
+          />
+        </div>
+        <div className="flex gap-3">
+          <button type="button" onClick={onClose} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold py-3 rounded-xl transition-all">Cancel</button>
+          <button type="submit" disabled={!selectedRegId || !prizeAmount || loading}
+            className="flex-1 bg-yellow-500 hover:bg-yellow-400 text-zinc-900 font-black uppercase tracking-widest py-3 rounded-xl transition-all disabled:opacity-50 shadow-lg shadow-yellow-500/20">
+            {loading ? "Crediting..." : "👑 Crown Winner"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+// ─── Room modal ───────────────────────────────────────────────────────────────
+function RoomModal({ tournamentId, onClose }: { tournamentId: number; onClose: () => void }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const setRoom = useSetRoomDetails();
+  const [roomId, setRoomId] = useState("");
+  const [roomPassword, setRoomPassword] = useState("");
+
+  const handleSetRoom = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await setRoom.mutateAsync({ id: tournamentId, data: { roomId, roomPassword } });
+      toast({ title: "Room details updated!" });
+      queryClient.invalidateQueries({ queryKey: getListTournamentsQueryKey({}) });
+      onClose();
+    } catch { toast({ title: "Failed", variant: "destructive" }); }
+  };
+
+  const inputCls = "w-full bg-zinc-800 border border-zinc-700 focus:border-orange-500 rounded-xl px-4 py-2.5 text-white font-mono text-sm outline-none transition-all";
+
+  return (
+    <Modal title="🔑 Set Room Details" onClose={onClose}>
+      <form onSubmit={handleSetRoom} className="space-y-4">
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2 flex items-center gap-1"><Hash className="w-3.5 h-3.5" /> Room ID</label>
+          <input value={roomId} onChange={(e) => setRoomId(e.target.value)} required placeholder="e.g. FF123456" className={inputCls} />
+        </div>
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2 flex items-center gap-1"><Lock className="w-3.5 h-3.5" /> Room Password</label>
+          <input value={roomPassword} onChange={(e) => setRoomPassword(e.target.value)} required placeholder="e.g. KING123" className={inputCls} />
+        </div>
+        <div className="flex gap-3">
+          <button type="button" onClick={onClose} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold py-3 rounded-xl transition-all">Cancel</button>
+          <button type="submit" disabled={setRoom.isPending}
+            className="flex-1 bg-orange-500 hover:bg-orange-400 text-white font-black uppercase tracking-widest py-3 rounded-xl transition-all disabled:opacity-50">
+            {setRoom.isPending ? "Saving..." : "Set Room"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+// ─── Registrations modal ──────────────────────────────────────────────────────
+function RegsModal({ tournamentId, onClose }: { tournamentId: number; onClose: () => void }) {
+  const { data: regs } = useGetTournamentRegistrations(tournamentId, {
+    query: { enabled: !!tournamentId, queryKey: getGetTournamentRegistrationsQueryKey(tournamentId) }
+  });
+  return (
+    <Modal title={`Registrations (${regs?.length ?? 0})`} onClose={onClose} wide>
+      <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+        {regs && regs.length > 0 ? regs.map((reg) => (
+          <div key={reg.id} className="bg-zinc-800/60 border border-zinc-700 rounded-xl p-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="font-bold text-white text-sm">{reg.freeFireName} <span className="text-zinc-500 text-xs font-mono">({reg.freeFireUid})</span></p>
+              {reg.teamName && <p className="text-xs text-zinc-500">Team: {reg.teamName}</p>}
+              <p className="text-xs text-zinc-600 font-mono">{reg.user?.email}</p>
+            </div>
+            <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-lg ${reg.status === "confirmed" ? "bg-green-500/20 text-green-400" : "bg-zinc-700 text-zinc-500"}`}>{reg.status}</span>
+          </div>
+        )) : <p className="text-zinc-500 font-mono text-sm text-center py-4">No registrations yet.</p>}
+      </div>
+    </Modal>
+  );
+}
+
+// ─── Tournaments tab ──────────────────────────────────────────────────────────
+function TournamentsTab() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { data: tournaments, isLoading } = useListTournaments({}, { query: { queryKey: getListTournamentsQueryKey({}) } });
   const createTournament = useCreateTournament();
   const updateTournament = useUpdateTournament();
   const deleteTournament = useDeleteTournament();
-  const setRoom = useSetRoomDetails();
-  const approveRecharge = useApproveRecharge();
-  const rejectRecharge = useRejectRecharge();
 
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
-  const [roomTournamentId, setRoomTournamentId] = useState<number | null>(null);
-  const [roomId, setRoomId] = useState("");
-  const [roomPassword, setRoomPassword] = useState("");
-  const [viewRegsTid, setViewRegsTid] = useState<number | null>(null);
-
-  const { data: viewRegs } = useGetTournamentRegistrations(viewRegsTid || 0, {
-    query: { enabled: !!viewRegsTid, queryKey: getGetTournamentRegistrationsQueryKey(viewRegsTid || 0) }
-  });
-
-  if (loading) return <div className="p-8 text-center font-mono">LOADING...</div>;
-  if (!dbUser?.isAdmin) { setLocation("/tournaments"); return null; }
+  const [roomTid, setRoomTid] = useState<number | null>(null);
+  const [regsTid, setRegsTid] = useState<number | null>(null);
+  const [winnerTid, setWinnerTid] = useState<number | null>(null);
 
   const handleCreate = async (data: any) => {
     try {
       await createTournament.mutateAsync({ data });
       toast({ title: "Tournament created!" });
-      setShowCreateForm(false);
+      setShowCreate(false);
       queryClient.invalidateQueries({ queryKey: getListTournamentsQueryKey({}) });
       queryClient.invalidateQueries({ queryKey: getGetAdminStatsQueryKey() });
-    } catch { toast({ title: "Failed", variant: "destructive" }); }
+    } catch { toast({ title: "Failed to create", variant: "destructive" }); }
   };
 
   const handleUpdate = async (id: number, data: any) => {
     try {
       await updateTournament.mutateAsync({ id, data });
-      toast({ title: "Updated!" });
+      toast({ title: "Tournament updated!" });
       setEditId(null);
       queryClient.invalidateQueries({ queryKey: getListTournamentsQueryKey({}) });
-    } catch { toast({ title: "Failed", variant: "destructive" }); }
+    } catch { toast({ title: "Failed to update", variant: "destructive" }); }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Delete this tournament?")) return;
+  const handleDelete = async (id: number, title: string) => {
+    if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
     try {
       await deleteTournament.mutateAsync({ id });
-      toast({ title: "Deleted" });
+      toast({ title: "Tournament deleted" });
       queryClient.invalidateQueries({ queryKey: getListTournamentsQueryKey({}) });
       queryClient.invalidateQueries({ queryKey: getGetAdminStatsQueryKey() });
-    } catch { toast({ title: "Failed", variant: "destructive" }); }
+    } catch { toast({ title: "Failed to delete", variant: "destructive" }); }
   };
 
-  const handleSetRoom = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!roomTournamentId) return;
-    try {
-      await setRoom.mutateAsync({ id: roomTournamentId, data: { roomId, roomPassword } });
-      toast({ title: "Room details set!" });
-      setRoomTournamentId(null);
-      setRoomId(""); setRoomPassword("");
-      queryClient.invalidateQueries({ queryKey: getListTournamentsQueryKey({}) });
-    } catch { toast({ title: "Failed", variant: "destructive" }); }
+  const STATUS_DOT: Record<string, string> = {
+    upcoming: "bg-blue-400", live: "bg-green-400 animate-pulse", completed: "bg-zinc-500"
   };
+  const MODE_COLOR: Record<string, string> = {
+    solo: "text-orange-400", duo: "text-blue-400", squad: "text-purple-400"
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="text-xl font-black uppercase tracking-widest text-white">Manage Tournaments</h2>
+        <button onClick={() => setShowCreate(true)}
+          className="flex items-center gap-2 bg-orange-500 hover:bg-orange-400 text-white font-black uppercase tracking-wider py-2.5 px-5 rounded-xl text-sm transition-all shadow-lg shadow-orange-500/20">
+          <Plus className="w-4 h-4" /> New Tournament
+        </button>
+      </div>
+
+      {showCreate && (
+        <div className="bg-zinc-900 border border-orange-500/30 rounded-2xl p-5 mb-5">
+          <h3 className="text-sm font-black uppercase tracking-widest text-orange-400 mb-4">New Tournament</h3>
+          <TournamentForm onSubmit={handleCreate} isPending={createTournament.isPending} onCancel={() => setShowCreate(false)} />
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl bg-zinc-800" />)}</div>
+      ) : (
+        <div className="space-y-3">
+          {tournaments?.map((t) => (
+            <div key={t.id} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+              {editId === t.id ? (
+                <div className="p-5">
+                  <h3 className="text-sm font-black uppercase tracking-widest text-orange-400 mb-4">Edit Tournament</h3>
+                  <TournamentForm initial={t} onSubmit={(d) => handleUpdate(t.id, d)} isPending={updateTournament.isPending} onCancel={() => setEditId(null)} />
+                </div>
+              ) : (
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`w-2 h-2 rounded-full ${STATUS_DOT[t.status] || "bg-zinc-500"}`} />
+                        <span className={`text-xs font-bold uppercase ${MODE_COLOR[t.mode] || ""}`}>{t.mode}</span>
+                        <span className="text-xs text-zinc-600 font-mono">{t.status}</span>
+                      </div>
+                      <h3 className="font-black text-white uppercase truncate">{t.title}</h3>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-zinc-500 font-mono flex-wrap">
+                        <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {t.filledSlots}/{t.maxSlots}</span>
+                        <span className="flex items-center gap-1"><Trophy className="w-3 h-3 text-yellow-400" /> {t.prizePool.toLocaleString()}</span>
+                        <span className="flex items-center gap-1"><Coins className="w-3 h-3 text-orange-400" /> {t.entryFee === 0 ? "FREE" : t.entryFee}</span>
+                        {t.mapName && <span>{t.mapName}</span>}
+                        {t.roomId && <span className="text-green-400 flex items-center gap-1"><Hash className="w-3 h-3" /> {t.roomId}</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <AdminBtn icon={<Eye className="w-3.5 h-3.5" />} label="Players" onClick={() => setRegsTid(t.id)} color="blue" />
+                      <AdminBtn icon={<Key className="w-3.5 h-3.5" />} label="Room" onClick={() => setRoomTid(t.id)} color="green" />
+                      <AdminBtn icon={<Crown className="w-3.5 h-3.5" />} label="Winner" onClick={() => setWinnerTid(t.id)} color="yellow" />
+                      <AdminBtn icon={<Edit3 className="w-3.5 h-3.5" />} label="Edit" onClick={() => setEditId(t.id)} color="default" />
+                      <button onClick={() => handleDelete(t.id, t.title)}
+                        className="flex items-center gap-1 text-xs font-bold text-red-400 border border-red-500/30 hover:bg-red-500/10 px-2.5 py-1.5 rounded-lg transition-colors">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {roomTid && <RoomModal tournamentId={roomTid} onClose={() => setRoomTid(null)} />}
+      {regsTid && <RegsModal tournamentId={regsTid} onClose={() => setRegsTid(null)} />}
+      {winnerTid && <WinnerModal tournamentId={winnerTid} onClose={() => setWinnerTid(null)} />}
+    </div>
+  );
+}
+
+// ─── Recharges tab ────────────────────────────────────────────────────────────
+function RechargesTab() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { data: requests, isLoading } = useListRechargeRequests({ query: { queryKey: getListRechargeRequestsQueryKey() } });
+  const approveRecharge = useApproveRecharge();
+  const rejectRecharge = useRejectRecharge();
+  const [viewImg, setViewImg] = useState<string | null>(null);
 
   const handleApprove = async (id: number) => {
     try {
       await approveRecharge.mutateAsync({ id });
-      toast({ title: "Recharge approved!" });
+      toast({ title: "✅ Recharge approved — coins credited!" });
       queryClient.invalidateQueries({ queryKey: getListRechargeRequestsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetAdminStatsQueryKey() });
     } catch { toast({ title: "Failed", variant: "destructive" }); }
@@ -196,131 +445,419 @@ export default function Admin() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-4xl font-black uppercase tracking-tighter mb-8">
-        Admin <span className="text-primary">Panel</span>
-      </h1>
+    <div>
+      <h2 className="text-xl font-black uppercase tracking-widest text-white mb-5">
+        Recharge Requests
+        {requests && requests.length > 0 && (
+          <span className="ml-2 bg-orange-500 text-white text-xs font-black px-2 py-0.5 rounded-full">{requests.length}</span>
+        )}
+      </h2>
+      {isLoading ? (
+        <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl bg-zinc-800" />)}</div>
+      ) : requests && requests.length > 0 ? (
+        <div className="space-y-3">
+          {requests.map((r: any) => (
+            <div key={r.id} className="bg-zinc-900 border border-yellow-500/20 rounded-xl p-4">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="font-black text-white">
+                      {r.userName || `User #${r.userId}`}
+                      <span className="ml-2 text-yellow-400 font-black">+{r.amount} coins</span>
+                    </p>
+                  </div>
+                  <p className="text-xs text-zinc-500 font-mono">{r.userEmail}</p>
+                  {r.utrNumber && (
+                    <p className="text-xs text-zinc-400 font-mono mt-1 flex items-center gap-1">
+                      <Hash className="w-3 h-3" /> UTR: <span className="font-bold text-white">{r.utrNumber}</span>
+                    </p>
+                  )}
+                  <p className="text-xs text-zinc-600 font-mono mt-1 flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {new Date(r.createdAt).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {r.screenshotUrl && (
+                    <button onClick={() => setViewImg(r.screenshotUrl)}
+                      className="flex items-center gap-1.5 text-xs font-bold text-blue-400 border border-blue-500/30 hover:bg-blue-500/10 px-3 py-1.5 rounded-lg transition-colors">
+                      <ImageIcon className="w-3.5 h-3.5" /> View Screenshot
+                    </button>
+                  )}
+                  <button onClick={() => handleApprove(r.id)}
+                    className="flex items-center gap-1.5 text-xs font-bold text-green-400 border border-green-500/30 hover:bg-green-500/10 px-3 py-1.5 rounded-lg transition-colors">
+                    <Check className="w-3.5 h-3.5" /> Approve
+                  </button>
+                  <button onClick={() => handleReject(r.id)}
+                    className="flex items-center gap-1.5 text-xs font-bold text-red-400 border border-red-500/30 hover:bg-red-500/10 px-3 py-1.5 rounded-lg transition-colors">
+                    <X className="w-3.5 h-3.5" /> Reject
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyState icon={<CreditCard className="w-10 h-10 text-zinc-700" />} label="No pending recharge requests" />
+      )}
 
-      <StatsGrid />
-
-      <Tabs defaultValue="tournaments">
-        <TabsList className="mb-6 bg-card border border-border">
-          <TabsTrigger value="tournaments" className="font-bold uppercase tracking-wider text-xs">Tournaments</TabsTrigger>
-          <TabsTrigger value="recharges" className="font-bold uppercase tracking-wider text-xs">
-            Recharges {rechargeRequests && rechargeRequests.length > 0 && <span className="ml-1 bg-primary text-primary-foreground rounded-full w-4 h-4 text-xs flex items-center justify-center">{rechargeRequests.length}</span>}
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="tournaments">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-black uppercase tracking-wider">Manage Tournaments</h2>
-            <Button data-testid="button-create-tournament" onClick={() => setShowCreateForm(true)} className="font-bold uppercase">
-              <Plus className="w-4 h-4 mr-1" /> New Tournament
-            </Button>
+      {viewImg && (
+        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4" onClick={() => setViewImg(null)}>
+          <div className="relative max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setViewImg(null)} className="absolute -top-10 right-0 text-zinc-400 hover:text-white"><X className="w-6 h-6" /></button>
+            <img src={viewImg} alt="UPI Screenshot" className="w-full rounded-2xl border border-zinc-700 shadow-2xl" />
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
-          {showCreateForm && (
-            <Card className="mb-6 border-primary/30">
-              <CardHeader><CardTitle className="font-black uppercase">Create Tournament</CardTitle></CardHeader>
-              <CardContent>
-                <TournamentForm onSubmit={handleCreate} isPending={createTournament.isPending} onCancel={() => setShowCreateForm(false)} />
-              </CardContent>
-            </Card>
-          )}
+// ─── Withdrawals tab ──────────────────────────────────────────────────────────
+function WithdrawalsTab() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [requests, setRequests] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<"pending" | "all">("pending");
 
-          {tLoading ? (
-            <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-lg" />)}</div>
-          ) : (
-            <div className="space-y-3">
-              {tournaments?.map((t) => (
-                <div key={t.id} className="bg-card border border-border rounded-lg p-4">
-                  {editId === t.id ? (
-                    <TournamentForm initial={t} onSubmit={(d) => handleUpdate(t.id, d)} isPending={updateTournament.isPending} onCancel={() => setEditId(null)} />
-                  ) : (
-                    <div className="flex items-center justify-between flex-wrap gap-3">
-                      <div>
-                        <h3 className="font-black uppercase">{t.title}</h3>
-                        <p className="text-xs text-muted-foreground font-mono uppercase">{t.mode} · {t.status} · {t.filledSlots}/{t.maxSlots} slots · {t.prizePool} prize</p>
-                      </div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Button size="sm" variant="outline" onClick={() => { setViewRegsTid(t.id); }}><Users className="w-3.5 h-3.5 mr-1" /> Registrations</Button>
-                        <Button size="sm" variant="outline" onClick={() => { setRoomTournamentId(t.id); }}><Key className="w-3.5 h-3.5 mr-1" /> Set Room</Button>
-                        <Button size="sm" variant="outline" onClick={() => setEditId(t.id)}><Edit3 className="w-3.5 h-3.5 mr-1" /> Edit</Button>
-                        <Button size="sm" variant="destructive" onClick={() => handleDelete(t.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
-                      </div>
-                    </div>
+  const fetchRequests = async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(`${BASE}/admin/withdraw-requests`, { headers: authHeaders() });
+      const data = await r.json();
+      setRequests(Array.isArray(data) ? data : []);
+    } catch { } finally { setLoading(false); }
+  };
+
+  useState(() => { fetchRequests(); });
+
+  const handleAction = async (id: number, action: "approve" | "reject") => {
+    try {
+      await fetch(`${BASE}/admin/withdraw-requests/${id}/${action}`, { method: "POST", headers: authHeaders() });
+      toast({ title: action === "approve" ? "Withdrawal approved!" : "Withdrawal rejected & refunded" });
+      fetchRequests();
+      queryClient.invalidateQueries({ queryKey: getGetAdminStatsQueryKey() });
+    } catch { toast({ title: "Failed", variant: "destructive" }); }
+  };
+
+  const filtered = filter === "pending" ? requests.filter((r) => r.status === "pending") : requests;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="text-xl font-black uppercase tracking-widest text-white">Withdrawal Requests</h2>
+        <div className="flex gap-2">
+          {["pending", "all"].map((f) => (
+            <button key={f} onClick={() => setFilter(f as any)}
+              className={`text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg border transition-all ${filter === f ? "bg-orange-500 border-orange-500 text-white" : "bg-zinc-900 border-zinc-700 text-zinc-400"}`}>
+              {f}
+            </button>
+          ))}
+        </div>
+      </div>
+      {loading ? (
+        <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl bg-zinc-800" />)}</div>
+      ) : filtered.length > 0 ? (
+        <div className="space-y-3">
+          {filtered.map((r) => (
+            <div key={r.id} className={`bg-zinc-900 border rounded-xl p-4 ${r.status === "pending" ? "border-red-500/20" : r.status === "completed" ? "border-green-500/20" : "border-zinc-800"}`}>
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="flex-1 min-w-0">
+                  <p className="font-black text-white">
+                    {r.userName || `User #${r.userId}`}
+                    <span className="ml-2 text-red-400 font-black">-{r.amount} coins</span>
+                  </p>
+                  <p className="text-xs text-zinc-500 font-mono">{r.userEmail}</p>
+                  {r.description && <p className="text-xs text-zinc-400 font-mono mt-1">{r.description}</p>}
+                  <p className="text-xs text-zinc-600 font-mono mt-1 flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {new Date(r.createdAt).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-bold uppercase px-2 py-1 rounded-lg ${r.status === "pending" ? "bg-yellow-500/20 text-yellow-400" : r.status === "completed" ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>
+                    {r.status}
+                  </span>
+                  {r.status === "pending" && (
+                    <>
+                      <button onClick={() => handleAction(r.id, "approve")}
+                        className="flex items-center gap-1 text-xs font-bold text-green-400 border border-green-500/30 hover:bg-green-500/10 px-3 py-1.5 rounded-lg transition-colors">
+                        <Check className="w-3.5 h-3.5" /> Approve
+                      </button>
+                      <button onClick={() => handleAction(r.id, "reject")}
+                        className="flex items-center gap-1 text-xs font-bold text-red-400 border border-red-500/30 hover:bg-red-500/10 px-3 py-1.5 rounded-lg transition-colors">
+                        <X className="w-3.5 h-3.5" /> Reject
+                      </button>
+                    </>
                   )}
                 </div>
-              ))}
+              </div>
             </div>
-          )}
-        </TabsContent>
+          ))}
+        </div>
+      ) : (
+        <EmptyState icon={<ArrowUpRight className="w-10 h-10 text-zinc-700" />} label="No withdrawal requests" />
+      )}
+    </div>
+  );
+}
 
-        <TabsContent value="recharges">
-          <h2 className="text-xl font-black uppercase tracking-wider mb-4">Pending Recharge Requests</h2>
-          {rLoading ? (
-            <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-lg" />)}</div>
-          ) : rechargeRequests && rechargeRequests.length > 0 ? (
-            <div className="space-y-3">
-              {rechargeRequests.map((r) => (
-                <div key={r.id} data-testid={`recharge-req-${r.id}`} className="bg-card border border-border rounded-lg p-4 flex items-center justify-between">
-                  <div>
-                    <p className="font-bold">User #{r.userId} — <span className="text-primary font-black">{r.amount} coins</span></p>
-                    <p className="text-xs text-muted-foreground font-mono">UTR: {r.utrNumber} · {new Date(r.createdAt).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}</p>
+// ─── Users tab ────────────────────────────────────────────────────────────────
+function UsersTab() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [creditUserId, setCreditUserId] = useState<number | null>(null);
+  const [creditAmount, setCreditAmount] = useState("");
+  const [creditNotes, setCreditNotes] = useState("");
+  const [crediting, setCrediting] = useState(false);
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(`${BASE}/admin/users`, { headers: authHeaders() });
+      setUsers(await r.json());
+    } catch { } finally { setLoading(false); }
+  };
+
+  useState(() => { fetchUsers(); });
+
+  const handleToggleAdmin = async (id: number, current: boolean) => {
+    try {
+      await fetch(`${BASE}/admin/users/${id}/admin`, {
+        method: "PATCH", headers: authHeaders(),
+        body: JSON.stringify({ isAdmin: !current }),
+      });
+      toast({ title: `Admin ${!current ? "granted" : "revoked"}` });
+      fetchUsers();
+    } catch { toast({ title: "Failed", variant: "destructive" }); }
+  };
+
+  const handleCredit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!creditUserId || !creditAmount) return;
+    setCrediting(true);
+    try {
+      await fetch(`${BASE}/admin/users/${creditUserId}/credit`, {
+        method: "POST", headers: authHeaders(),
+        body: JSON.stringify({ amount: parseInt(creditAmount), notes: creditNotes || undefined }),
+      });
+      toast({ title: `+${creditAmount} coins credited!` });
+      setCreditUserId(null); setCreditAmount(""); setCreditNotes("");
+      fetchUsers();
+    } catch { toast({ title: "Failed", variant: "destructive" }); }
+    finally { setCrediting(false); }
+  };
+
+  const filtered = users.filter((u) =>
+    !search || u.displayName?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="text-xl font-black uppercase tracking-widest text-white">Player Management</h2>
+        <div className="relative">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+          <input
+            value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search players..."
+            className="bg-zinc-900 border border-zinc-700 rounded-xl pl-9 pr-4 py-2 text-sm text-white font-mono outline-none focus:border-orange-500 transition-all w-52"
+          />
+        </div>
+      </div>
+      {loading ? (
+        <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl bg-zinc-800" />)}</div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((u) => (
+            <div key={u.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                {u.photoUrl ? (
+                  <img src={u.photoUrl} alt="" className="w-9 h-9 rounded-full border border-zinc-700 object-cover shrink-0" />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
+                    <Users className="w-4 h-4 text-zinc-600" />
                   </div>
-                  <div className="flex gap-2">
-                    <Button data-testid={`button-approve-${r.id}`} size="sm" className="bg-green-600 hover:bg-green-700 font-bold" onClick={() => handleApprove(r.id)}>
-                      <Check className="w-3.5 h-3.5 mr-1" /> Approve
-                    </Button>
-                    <Button data-testid={`button-reject-${r.id}`} size="sm" variant="destructive" onClick={() => handleReject(r.id)}>
-                      <X className="w-3.5 h-3.5 mr-1" /> Reject
-                    </Button>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-bold text-white text-sm truncate">{u.displayName}</p>
+                    {u.isAdmin && <Shield className="w-3.5 h-3.5 text-orange-400 shrink-0" />}
                   </div>
+                  <p className="text-xs text-zinc-500 font-mono truncate">{u.email}</p>
+                  {u.freeFireName && <p className="text-xs text-orange-400/70 font-mono">〔{u.freeFireName}〕</p>}
                 </div>
-              ))}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5">
+                  <Coins className="w-3.5 h-3.5 text-yellow-400" />
+                  <span className="text-yellow-400 font-black text-sm">{u.walletBalance}</span>
+                </div>
+                <button onClick={() => { setCreditUserId(u.id); setCreditAmount(""); setCreditNotes(""); }}
+                  className="flex items-center gap-1 text-xs font-bold text-green-400 border border-green-500/30 hover:bg-green-500/10 px-2.5 py-1.5 rounded-lg transition-colors">
+                  <Plus className="w-3.5 h-3.5" /> Credit
+                </button>
+                <button onClick={() => handleToggleAdmin(u.id, u.isAdmin)}
+                  className={`flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors border ${u.isAdmin ? "text-orange-400 border-orange-500/30 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30" : "text-zinc-500 border-zinc-700 hover:bg-orange-500/10 hover:text-orange-400 hover:border-orange-500/30"}`}>
+                  <UserCog className="w-3.5 h-3.5" />
+                  {u.isAdmin ? "Revoke" : "Admin"}
+                </button>
+              </div>
             </div>
-          ) : (
-            <div className="text-center py-12 border border-border rounded-lg">
-              <p className="text-muted-foreground font-mono">No pending recharge requests.</p>
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+          ))}
+        </div>
+      )}
 
-      {/* Set Room Dialog */}
-      <Dialog open={!!roomTournamentId} onOpenChange={(o) => { if (!o) setRoomTournamentId(null); }}>
-        <DialogContent className="bg-card border border-border">
-          <DialogHeader><DialogTitle className="font-black uppercase">Set Room Details</DialogTitle></DialogHeader>
-          <form onSubmit={handleSetRoom} className="space-y-4">
-            <div className="space-y-2"><Label>Room ID</Label><Input data-testid="input-room-id" value={roomId} onChange={e => setRoomId(e.target.value)} required className="font-mono" /></div>
-            <div className="space-y-2"><Label>Room Password</Label><Input data-testid="input-room-password" value={roomPassword} onChange={e => setRoomPassword(e.target.value)} required className="font-mono" /></div>
-            <Button type="submit" className="w-full font-bold uppercase" disabled={setRoom.isPending}>{setRoom.isPending ? "Setting..." : "Set Room Details"}</Button>
+      {creditUserId && (
+        <Modal title={`💰 Credit Coins — ${users.find((u) => u.id === creditUserId)?.displayName}`} onClose={() => setCreditUserId(null)}>
+          <form onSubmit={handleCredit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Amount (coins)</label>
+              <input type="number" min={1} value={creditAmount} onChange={(e) => setCreditAmount(e.target.value)} required placeholder="e.g. 500"
+                className="w-full bg-zinc-800 border border-zinc-700 focus:border-green-500 rounded-xl px-4 py-2.5 text-white font-mono text-sm outline-none transition-all" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Notes (optional)</label>
+              <input value={creditNotes} onChange={(e) => setCreditNotes(e.target.value)} placeholder="Reason for credit..."
+                className="w-full bg-zinc-800 border border-zinc-700 focus:border-green-500 rounded-xl px-4 py-2.5 text-white font-mono text-sm outline-none transition-all" />
+            </div>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setCreditUserId(null)} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold py-3 rounded-xl transition-all">Cancel</button>
+              <button type="submit" disabled={crediting}
+                className="flex-1 bg-green-500 hover:bg-green-400 text-white font-black uppercase tracking-widest py-3 rounded-xl transition-all disabled:opacity-50 shadow-lg shadow-green-500/20">
+                {crediting ? "Crediting..." : `+ Credit ${creditAmount || "?"} coins`}
+              </button>
+            </div>
           </form>
-        </DialogContent>
-      </Dialog>
+        </Modal>
+      )}
+    </div>
+  );
+}
 
-      {/* View Registrations Dialog */}
-      <Dialog open={!!viewRegsTid} onOpenChange={(o) => { if (!o) setViewRegsTid(null); }}>
-        <DialogContent className="bg-card border border-border max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader><DialogTitle className="font-black uppercase">Tournament Registrations</DialogTitle></DialogHeader>
-          {viewRegs && viewRegs.length > 0 ? (
-            <div className="space-y-2 mt-2">
-              {viewRegs.map((reg) => (
-                <div key={reg.id} className="bg-background border border-border rounded p-3 flex items-center justify-between">
-                  <div>
-                    <p className="font-bold font-mono">{reg.freeFireName} <span className="text-muted-foreground text-xs">({reg.freeFireUid})</span></p>
-                    {reg.teamName && <p className="text-xs text-muted-foreground font-mono">Team: {reg.teamName}</p>}
-                    <p className="text-xs text-muted-foreground font-mono">{reg.user?.email}</p>
-                  </div>
-                  <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded ${reg.status === "confirmed" ? "bg-green-500/20 text-green-400" : "bg-gray-500/20 text-gray-400"}`}>{reg.status}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-muted-foreground font-mono text-sm mt-2">No registrations yet.</p>
-          )}
-        </DialogContent>
-      </Dialog>
+// ─── Shared helpers ───────────────────────────────────────────────────────────
+function AdminBtn({ icon, label, onClick, color }: { icon: React.ReactNode; label: string; onClick: () => void; color: string }) {
+  const colors: Record<string, string> = {
+    blue: "text-blue-400 border-blue-500/30 hover:bg-blue-500/10",
+    green: "text-green-400 border-green-500/30 hover:bg-green-500/10",
+    yellow: "text-yellow-400 border-yellow-500/30 hover:bg-yellow-500/10",
+    default: "text-zinc-400 border-zinc-700 hover:bg-zinc-800",
+  };
+  return (
+    <button onClick={onClick} className={`flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-lg border transition-colors ${colors[color] || colors.default}`}>
+      {icon} {label}
+    </button>
+  );
+}
+
+function EmptyState({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <div className="text-center py-16 border border-zinc-800 rounded-2xl bg-zinc-900/40">
+      <div className="flex justify-center mb-3">{icon}</div>
+      <p className="text-zinc-500 font-mono text-sm uppercase tracking-wider">{label}</p>
+    </div>
+  );
+}
+
+function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className={`bg-zinc-900 border border-zinc-700 rounded-2xl w-full shadow-2xl overflow-hidden ${wide ? "max-w-2xl" : "max-w-md"}`}>
+        <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
+          <h3 className="font-black uppercase tracking-widest text-white text-sm">{title}</h3>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="p-5">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Admin Page ──────────────────────────────────────────────────────────
+export default function Admin() {
+  const { dbUser, loading } = useAuth();
+  const [, setLocation] = useLocation();
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const { data: stats } = useGetAdminStats({ query: { queryKey: getGetAdminStatsQueryKey() } });
+
+  if (loading) return (
+    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+      <div className="w-8 h-8 rounded-full border-2 border-orange-500 border-t-transparent animate-spin" />
+    </div>
+  );
+  if (!dbUser?.isAdmin) { setLocation("/dashboard"); return null; }
+
+  const badgeCounts: Record<string, number> = {
+    recharges: stats?.pendingRecharges ?? 0,
+    withdrawals: stats?.pendingWithdrawals ?? 0,
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0a0a0a] flex">
+      {/* Sidebar */}
+      <div className="w-56 shrink-0 bg-zinc-900 border-r border-zinc-800 flex flex-col py-6 hidden md:flex">
+        <div className="px-5 mb-8">
+          <div className="flex items-center gap-2 mb-1">
+            <Shield className="w-4 h-4 text-orange-400" />
+            <span className="text-xs font-mono uppercase tracking-widest text-orange-400">Admin Panel</span>
+          </div>
+          <p className="text-white font-black uppercase tracking-tight text-sm">BAADSHAH FF</p>
+        </div>
+        <nav className="space-y-1 px-3 flex-1">
+          {TABS.map((tab) => {
+            const badge = tab.badge ? badgeCounts[tab.badge] : 0;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === tab.id ? "bg-orange-500/20 text-orange-400 border border-orange-500/30" : "text-zinc-500 hover:text-white hover:bg-zinc-800"}`}
+              >
+                {tab.icon}
+                <span className="flex-1 text-left">{tab.label}</span>
+                {badge > 0 && (
+                  <span className="bg-orange-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">{badge}</span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+        <div className="px-4 pt-4 border-t border-zinc-800 mx-3">
+          <p className="text-[10px] text-zinc-700 font-mono uppercase">Logged in as admin</p>
+          <p className="text-xs text-zinc-500 font-mono truncate">{dbUser?.email}</p>
+        </div>
+      </div>
+
+      {/* Mobile top nav */}
+      <div className="md:hidden fixed top-0 left-0 right-0 bg-zinc-900 border-b border-zinc-800 z-40 flex overflow-x-auto gap-1 p-2">
+        {TABS.map((tab) => {
+          const badge = tab.badge ? badgeCounts[tab.badge] : 0;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${activeTab === tab.id ? "bg-orange-500 text-white" : "text-zinc-500 hover:text-white"}`}
+            >
+              {tab.icon} {tab.label}
+              {badge > 0 && <span className="bg-white text-orange-500 text-[10px] font-black px-1 rounded-full">{badge}</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-auto md:pt-0 pt-16">
+        <div className="p-6 max-w-5xl mx-auto">
+          {activeTab === "dashboard" && <DashboardTab />}
+          {activeTab === "tournaments" && <TournamentsTab />}
+          {activeTab === "recharges" && <RechargesTab />}
+          {activeTab === "withdrawals" && <WithdrawalsTab />}
+          {activeTab === "users" && <UsersTab />}
+        </div>
+      </div>
     </div>
   );
 }
