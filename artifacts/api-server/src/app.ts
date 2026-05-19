@@ -17,7 +17,7 @@ app.use(
           url: req.url?.split("?")[0],
         };
       },
-      res(res: any)
+      res(res: any) {
         return {
           statusCode: res.statusCode,
         };
