@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { db, usersTable, walletsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth";
@@ -7,12 +7,12 @@ import { z } from "zod";
 
 const router = Router();
 
-router.get("/me", requireAuth, async (req: any, res: any) => {
+router.get("/me", requireAuth, async (req: any, res: any): Promise<void> => {
   const user = req.currentUser;
   res.json(user);
 });
 
-router.post("/sync", async (req: any, res: any) => {
+router.post("/sync", async (req: any, res: any): Promise<void> => {
   const parsed = SyncUserBody.safeParse(req.body);
 
   if (!parsed.success) {
@@ -72,26 +72,30 @@ const FfUpdateBody = z.object({
   freeFireName: z.string().optional(),
 });
 
-router.patch("/me/ff", requireAuth, async (req: any, res: any) => {
-  const parsed = FfUpdateBody.safeParse(req.body);
+router.patch(
+  "/me/ff",
+  requireAuth,
+  async (req: any, res: any): Promise<void> => {
+    const parsed = FfUpdateBody.safeParse(req.body);
 
-  if (!parsed.success) {
-    res.status(400).json({ error: "Invalid body" });
-    return;
-  }
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid body" });
+      return;
+    }
 
-  const user = req.currentUser;
+    const user = req.currentUser;
 
-  const updated = await db
-    .update(usersTable)
-    .set({
-      freeFireUid: parsed.data.freeFireUid,
-      freeFireName: parsed.data.freeFireName,
-    })
-    .where(eq(usersTable.id, user.id))
-    .returning();
+    const updated = await db
+      .update(usersTable)
+      .set({
+        freeFireUid: parsed.data.freeFireUid,
+        freeFireName: parsed.data.freeFireName,
+      })
+      .where(eq(usersTable.id, user.id))
+      .returning();
 
-  res.json(updated[0]);
-});
+    res.json(updated[0]);
+  },
+);
 
 export default router;
