@@ -9,6 +9,7 @@ import { Layout } from "./components/Layout";
 import Home from "./pages/home";
 import Login from "./pages/login";
 import Register from "./pages/register";
+import Dashboard from "./pages/dashboard";
 import Tournaments from "./pages/tournaments";
 import TournamentDetail from "./pages/tournament-detail";
 import MyTournaments from "./pages/my-tournaments";
@@ -56,6 +57,7 @@ function Router() {
         <Route path="/" component={Home} />
         <Route path="/login" component={Login} />
         <Route path="/register" component={Register} />
+        <Route path="/dashboard" component={() => <ProtectedRoute component={Dashboard} />} />
         <Route path="/tournaments" component={() => <ProtectedRoute component={Tournaments} />} />
         <Route path="/tournaments/:id" component={() => <ProtectedRoute component={TournamentDetail} />} />
         <Route path="/my-tournaments" component={() => <ProtectedRoute component={MyTournaments} />} />
