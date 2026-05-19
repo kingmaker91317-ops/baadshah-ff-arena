@@ -358,6 +358,14 @@ export async function customFetch<T = unknown>(
     }
   }
 
+  // Firebase Auth Header
+  if (typeof localStorage !== "undefined") {
+    const uid = localStorage.getItem("firebase_uid");
+    if (uid) {
+      headers.set("x-firebase-uid", uid);
+    }
+  }
+
   const requestInfo = { method, url: resolveUrl(input) };
 
   const response = await fetch(input, { ...init, method, headers });

@@ -1,22 +1,30 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: BAADSHAH FF ARENA - Free Fire Tournament Platform API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: User authentication
+  - name: tournaments
+    description: Tournament management
+  - name: wallet
+    description: Wallet and transactions
+  - name: registrations
+    description: Tournament registrations
+  - name: admin
+    description: Admin operations
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +32,355 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /users/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user profile
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+
+  /users/sync:
+    post:
+      operationId: syncUser
+      tags: [auth]
+      summary: Sync Firebase user into DB after login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserSync"
+      responses:
+        "200":
+          description: Synced user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /tournaments:
+    get:
+      operationId: listTournaments
+      tags: [tournaments]
+      summary: List all tournaments
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [upcoming, live, completed]
+        - in: query
+          name: mode
+          schema:
+            type: string
+            enum: [solo, duo, squad]
+      responses:
+        "200":
+          description: Tournament list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tournament"
+    post:
+      operationId: createTournament
+      tags: [admin]
+      summary: Create a new tournament (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TournamentInput"
+      responses:
+        "201":
+          description: Created tournament
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tournament"
+
+  /tournaments/{id}:
+    get:
+      operationId: getTournament
+      tags: [tournaments]
+      summary: Get tournament details
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Tournament details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tournament"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateTournament
+      tags: [admin]
+      summary: Update tournament (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TournamentUpdate"
+      responses:
+        "200":
+          description: Updated tournament
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tournament"
+    delete:
+      operationId: deleteTournament
+      tags: [admin]
+      summary: Delete tournament (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /tournaments/{id}/room:
+    patch:
+      operationId: setRoomDetails
+      tags: [admin]
+      summary: Set room ID and password for a tournament
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoomDetails"
+      responses:
+        "200":
+          description: Updated room details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tournament"
+
+  /tournaments/{id}/register:
+    post:
+      operationId: registerForTournament
+      tags: [registrations]
+      summary: Register current user for a tournament
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegistrationInput"
+      responses:
+        "201":
+          description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Registration"
+        "400":
+          description: Insufficient balance or already registered
+
+  /tournaments/{id}/registrations:
+    get:
+      operationId: getTournamentRegistrations
+      tags: [admin]
+      summary: List registrations for a tournament (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of registrations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Registration"
+
+  /registrations/my:
+    get:
+      operationId: getMyRegistrations
+      tags: [registrations]
+      summary: Get current user's registrations
+      responses:
+        "200":
+          description: My registrations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Registration"
+
+  /wallet:
+    get:
+      operationId: getWallet
+      tags: [wallet]
+      summary: Get current user's wallet balance
+      responses:
+        "200":
+          description: Wallet info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Wallet"
+
+  /wallet/transactions:
+    get:
+      operationId: getTransactions
+      tags: [wallet]
+      summary: Get wallet transaction history
+      responses:
+        "200":
+          description: Transaction list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Transaction"
+
+  /wallet/recharge:
+    post:
+      operationId: rechargeWallet
+      tags: [wallet]
+      summary: Request a wallet recharge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RechargeInput"
+      responses:
+        "201":
+          description: Recharge request created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  /admin/recharge-requests:
+    get:
+      operationId: listRechargeRequests
+      tags: [admin]
+      summary: List pending recharge requests (admin only)
+      responses:
+        "200":
+          description: Recharge requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Transaction"
+
+  /admin/recharge-requests/{id}/approve:
+    post:
+      operationId: approveRecharge
+      tags: [admin]
+      summary: Approve a recharge request (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  /admin/recharge-requests/{id}/reject:
+    post:
+      operationId: rejectRecharge
+      tags: [admin]
+      summary: Reject a recharge request (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  /admin/stats:
+    get:
+      operationId: getAdminStats
+      tags: [admin]
+      summary: Get platform-wide admin stats
+      responses:
+        "200":
+          description: Admin dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+
+  /tournaments/stats:
+    get:
+      operationId: getTournamentStats
+      tags: [tournaments]
+      summary: Get public tournament summary stats
+      responses:
+        "200":
+          description: Platform stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TournamentStats"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +388,239 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        firebaseUid:
+          type: string
+        email:
+          type: string
+        displayName:
+          type: string
+        photoUrl:
+          type: ["string", "null"]
+        freeFireUid:
+          type: ["string", "null"]
+        freeFireName:
+          type: ["string", "null"]
+        isAdmin:
+          type: boolean
+        createdAt:
+          type: string
+      required: [id, firebaseUid, email, displayName, isAdmin, createdAt]
+
+    UserSync:
+      type: object
+      properties:
+        firebaseUid:
+          type: string
+        email:
+          type: string
+        displayName:
+          type: string
+        photoUrl:
+          type: ["string", "null"]
+      required: [firebaseUid, email, displayName]
+
+    Tournament:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        mode:
+          type: string
+          enum: [solo, duo, squad]
+        status:
+          type: string
+          enum: [upcoming, live, completed]
+        prizePool:
+          type: integer
+        entryFee:
+          type: integer
+        maxSlots:
+          type: integer
+        filledSlots:
+          type: integer
+        scheduledAt:
+          type: string
+        roomId:
+          type: ["string", "null"]
+        roomPassword:
+          type: ["string", "null"]
+        mapName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required: [id, title, mode, status, prizePool, entryFee, maxSlots, filledSlots, scheduledAt, createdAt]
+
+    TournamentInput:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        mode:
+          type: string
+          enum: [solo, duo, squad]
+        prizePool:
+          type: integer
+        entryFee:
+          type: integer
+        maxSlots:
+          type: integer
+        scheduledAt:
+          type: string
+        mapName:
+          type: string
+      required: [title, mode, prizePool, entryFee, maxSlots, scheduledAt]
+
+    TournamentUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [upcoming, live, completed]
+        prizePool:
+          type: integer
+        entryFee:
+          type: integer
+        maxSlots:
+          type: integer
+        scheduledAt:
+          type: string
+        mapName:
+          type: string
+
+    RoomDetails:
+      type: object
+      properties:
+        roomId:
+          type: string
+        roomPassword:
+          type: string
+      required: [roomId, roomPassword]
+
+    Registration:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        tournamentId:
+          type: integer
+        freeFireUid:
+          type: string
+        freeFireName:
+          type: string
+        teamName:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [confirmed, cancelled]
+        createdAt:
+          type: string
+        tournament:
+          $ref: "#/components/schemas/Tournament"
+        user:
+          $ref: "#/components/schemas/User"
+      required: [id, userId, tournamentId, freeFireUid, freeFireName, status, createdAt]
+
+    RegistrationInput:
+      type: object
+      properties:
+        freeFireUid:
+          type: string
+        freeFireName:
+          type: string
+        teamName:
+          type: string
+      required: [freeFireUid, freeFireName]
+
+    Wallet:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        balance:
+          type: integer
+        updatedAt:
+          type: string
+      required: [id, userId, balance, updatedAt]
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        type:
+          type: string
+          enum: [recharge, deduction, refund]
+        amount:
+          type: integer
+        status:
+          type: string
+          enum: [pending, completed, rejected]
+        description:
+          type: ["string", "null"]
+        utrNumber:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required: [id, userId, type, amount, status, createdAt]
+
+    RechargeInput:
+      type: object
+      properties:
+        amount:
+          type: integer
+        utrNumber:
+          type: string
+      required: [amount, utrNumber]
+
+    AdminStats:
+      type: object
+      properties:
+        totalUsers:
+          type: integer
+        totalTournaments:
+          type: integer
+        activeTournaments:
+          type: integer
+        totalRegistrations:
+          type: integer
+        pendingRecharges:
+          type: integer
+        totalRevenue:
+          type: integer
+      required: [totalUsers, totalTournaments, activeTournaments, totalRegistrations, pendingRecharges, totalRevenue]
+
+    TournamentStats:
+      type: object
+      properties:
+        totalTournaments:
+          type: integer
+        upcomingCount:
+          type: integer
+        liveCount:
+          type: integer
+        totalPrizePool:
+          type: integer
+      required: [totalTournaments, upcomingCount, liveCount, totalPrizePool]

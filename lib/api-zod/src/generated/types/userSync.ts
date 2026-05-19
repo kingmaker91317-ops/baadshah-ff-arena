@@ -6,6 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface HealthStatus {
-  status: string;
+export interface UserSync {
+  firebaseUid: string;
+  email: string;
+  displayName: string;
+  /** @nullable */
+  photoUrl?: string | null;
 }
